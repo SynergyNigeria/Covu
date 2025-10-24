@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COVU API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        button.success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        #output {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .log-entry {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .log-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .log-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .log-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .log-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .json-display {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 COVU API Tester</h1>
+        <p class="subtitle">Test your Order/Escrow backend connection</p>
+        
+        <!-- Connection Status -->
+        <div class="section">
+            <h2 class="section-title">Connection Status</h2>
+            <div>
+                <span id="connectionStatus">Checking...</span>
+                <button onclick="testConnection()">Test Connection</button>
+            </div>
+        </div>
+        
+        <!-- Authentication -->
+        <div class="section">
+            <h2 class="section-title">1. Authentication</h2>
+            <div class="input-group">
+                <label>Email:</label>
+                <input type="email" id="email" value="buyer@test.com">
+            </div>
+            <div class="input-group">
+                <label>Password:</label>
+                <input type="password" id="password" value="testpass123">
+            </div>
+            <div class="button-group">
+                <button onclick="login()">Login</button>
+                <button onclick="getProfile()">Get Profile</button>
+                <button class="danger" onclick="logout()">Logout</button>
+            </div>
+        </div>
+        
+        <!-- Wallet Operations -->
+        <div class="section">
+            <h2 class="section-title">2. Wallet Operations</h2>
+            <div class="button-group">
+                <button class="success" onclick="getBalance()">Get Balance</button>
+                <button class="success" onclick="getTransactions()">Get Transactions</button>
+                <button onclick="fundWallet()">Fund Wallet (₦5000)</button>
+            </div>
+        </div>
+        
+        <!-- Store Operations -->
+        <div class="section">
+            <h2 class="section-title">3. Store & Products</h2>
+            <div class="button-group">
+                <button onclick="listStores()">List Stores</button>
+                <button onclick="listProducts()">List Products</button>
+            </div>
+        </div>
+        
+        <!-- Order Operations -->
+        <div class="section">
+            <h2 class="section-title">4. Order & Escrow Flow</h2>
+            <div class="button-group">
+                <button onclick="createOrder()">Create Order</button>
+                <button onclick="listOrders('buyer')">My Orders (Buyer)</button>
+                <button onclick="listOrders('seller')">My Orders (Seller)</button>
+                <button onclick="getOrderStats()">Order Statistics</button>
+            </div>
+        </div>
+        
+        <!-- Output Console -->
+        <div class="section">
+            <h2 class="section-title">Output Console</h2>
+            <div id="output"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let token = null;
+        let currentOrderId = null;
+        
+        function log(message, type = 'info', data = null) {
+            const output = document.getElementById('output');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            if (data) {
+                const jsonDiv = document.createElement('div');
+                jsonDiv.className = 'json-display';
+                jsonDiv.textContent = JSON.stringify(data, null, 2);
+                entry.appendChild(jsonDiv);
+            }
+            
+            output.insertBefore(entry, output.firstChild);
+        }
+        
+        async function testConnection() {
+            try {
+                log('Testing connection to backend...', 'info');
+                const response = await fetch(`${API_BASE}/stores/`);
+                const data = await response.json();
+                
+                document.getElementById('connectionStatus').innerHTML = 
+                    `<span class="status-badge status-connected">✅ Connected to ${API_BASE}</span>`;
+                
+                log(`✅ Connection successful! Found ${data.count} stores`, 'success');
+            } catch (error) {
+                document.getElementById('connectionStatus').innerHTML = 
+                    `<span class="status-badge status-disconnected">❌ Disconnected</span>`;
+                
+                log(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                log(`Logging in as ${email}...`, 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/login/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    token = data.access;
+                    log(`✅ Login successful! Welcome, ${data.user.full_name}`, 'success', {
+                        user: data.user,
+                        token: data.access.substring(0, 50) + '...'
+                    });
+                } else {
+                    log(`❌ Login failed`, 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function getProfile() {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                log('Fetching profile...', 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/profile/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('✅ Profile retrieved', 'success', data);
+                } else {
+                    log('❌ Failed to get profile', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function logout() {
+            token = null;
+            log('👋 Logged out successfully', 'info');
+        }
+        
+        async function getBalance() {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                log('Fetching wallet balance...', 'info');
+                
+                const response = await fetch(`${API_BASE}/wallet/balance/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Balance: ₦${parseFloat(data.balance).toLocaleString()}`, 'success', data);
+                } else {
+                    log('❌ Failed to get balance', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function getTransactions() {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                log('Fetching transaction history...', 'info');
+                
+                const response = await fetch(`${API_BASE}/wallet/transactions/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Found ${data.count} transactions`, 'success', {
+                        count: data.count,
+                        recent: data.results.slice(0, 3)
+                    });
+                } else {
+                    log('❌ Failed to get transactions', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function fundWallet() {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                log('Initializing Paystack payment for ₦5,000...', 'info');
+                
+                const response = await fetch(`${API_BASE}/wallet/fund/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount: 5000 })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('✅ Payment initialized! Redirect to Paystack:', 'success', data);
+                    log(`🔗 Authorization URL: ${data.authorization_url}`, 'info');
+                } else {
+                    log('❌ Failed to initialize payment', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function listStores() {
+            try {
+                log('Fetching stores...', 'info');
+                
+                const response = await fetch(`${API_BASE}/stores/`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Found ${data.count} stores`, 'success', {
+                        count: data.count,
+                        stores: data.results.slice(0, 3).map(s => ({
+                            name: s.name,
+                            location: `${s.city}, ${s.state}`,
+                            products: s.product_count
+                        }))
+                    });
+                } else {
+                    log('❌ Failed to fetch stores', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function listProducts() {
+            try {
+                log('Fetching products...', 'info');
+                
+                const response = await fetch(`${API_BASE}/products/`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Found ${data.count} products`, 'success', {
+                        count: data.count,
+                        products: data.results.slice(0, 3).map(p => ({
+                            name: p.name,
+                            price: `₦${parseFloat(p.price).toLocaleString()}`,
+                            store: p.store.name
+                        }))
+                    });
+                } else {
+                    log('❌ Failed to fetch products', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createOrder() {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                // First, get a product
+                log('Fetching products to create order...', 'info');
+                const productsResp = await fetch(`${API_BASE}/products/`);
+                const productsData = await productsResp.json();
+                
+                if (!productsData.results || productsData.results.length === 0) {
+                    log('❌ No products found. Please add products first.', 'error');
+                    return;
+                }
+                
+                const product = productsData.results[0];
+                
+                log(`Creating order for: ${product.name} (₦${product.price})...`, 'info');
+                
+                const response = await fetch(`${API_BASE}/orders/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_id: product.id,
+                        delivery_address: '123 Test Street, Lagos, Nigeria'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentOrderId = data.id;
+                    log(`✅ Order created! Order #${data.order_number}`, 'success', {
+                        order_number: data.order_number,
+                        total_amount: `₦${parseFloat(data.total_amount).toLocaleString()}`,
+                        status: data.status,
+                        escrow_status: data.escrow_status,
+                        product: data.product.name
+                    });
+                } else {
+                    log('❌ Failed to create order', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function listOrders(viewType) {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                const asSeller = viewType === 'seller' ? '?as_seller=true' : '';
+                log(`Fetching orders (${viewType} view)...`, 'info');
+                
+                const response = await fetch(`${API_BASE}/orders/${asSeller}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Found ${data.count} orders as ${viewType}`, 'success', {
+                        count: data.count,
+                        view: data.view,
+                        orders: data.results.slice(0, 3).map(o => ({
+                            order_number: o.order_number,
+                            product: o.product_name,
+                            amount: `₦${parseFloat(o.total_amount).toLocaleString()}`,
+                            status: o.status
+                        }))
+                    });
+                } else {
+                    log('❌ Failed to fetch orders', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function getOrderStats() {
+            if (!token) {
+                log('⚠️ Please login first!', 'warning');
+                return;
+            }
+            
+            try {
+                log('Fetching order statistics...', 'info');
+                
+                const response = await fetch(`${API_BASE}/orders/stats/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('✅ Order statistics retrieved', 'success', data);
+                } else {
+                    log('❌ Failed to get statistics', 'error', data);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Test connection on load
+        window.onload = () => {
+            testConnection();
+            log('🚀 COVU API Tester initialized', 'info');
+            log('💡 Tip: Login with buyer@test.com / testpass123', 'info');
+        };
+    </script>
+</body>
+</html>
