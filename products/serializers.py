@@ -103,12 +103,12 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating/updating products.
     Seller can only modify products in their own stores.
+    Store is automatically assigned based on authenticated user.
     """
 
     class Meta:
         model = Product
         fields = [
-            "store",
             "name",
             "description",
             "price",
@@ -119,6 +119,15 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             "modern_design",
             "easy_maintain",
         ]
+
+        def create(self, validated_data):
+            user = self.context["request"].user
+            if not hasattr(user, "store"):
+                raise serializers.ValidationError(
+                    "You must create a store before adding products"
+                )
+            validated_data["store"] = user.store
+            return super().create(validated_data)
 
     def validate_price(self, value):
         """Ensure price is positive"""
@@ -147,13 +156,16 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         return value.lower()
 
-    def validate_store(self, value):
-        """Ensure user owns the store"""
+    def create(self, validated_data):
+        """Create product and auto-assign user's store"""
         user = self.context["request"].user
 
-        if value.seller != user:
+        # Check if user has a store
+        if not hasattr(user, "store"):
             raise serializers.ValidationError(
-                "You can only add products to your own stores"
+                "You must create a store before adding products"
             )
 
-        return value
+        # Auto-assign the user's store
+        validated_data["store"] = user.store
+        return super().create(validated_data)
