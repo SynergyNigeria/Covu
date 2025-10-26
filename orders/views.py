@@ -338,8 +338,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         """
         Get order statistics for current user.
 
-        Returns counts by status for both buyer and seller views.
+        Returns counts by status for both buyer and seller views,
+        plus revenue (sum of confirmed sales as seller) and active_orders (all non-cancelled/non-confirmed orders as buyer or seller).
         """
+        from django.db.models import Sum, Q
+
         user = request.user
 
         buyer_stats = {
@@ -360,4 +363,27 @@ class OrderViewSet(viewsets.ModelViewSet):
             "cancelled": Order.objects.filter(seller=user, status="CANCELLED").count(),
         }
 
-        return Response({"buyer": buyer_stats, "seller": seller_stats})
+        # Revenue: sum of confirmed sales as seller
+        revenue = (
+            Order.objects.filter(seller=user, status="CONFIRMED")
+            .aggregate(total=Sum("total_amount"))
+            .get("total")
+            or 0
+        )
+
+        # Active orders: all orders as buyer or seller, not cancelled or confirmed
+        active_orders = Order.objects.filter(
+            (
+                (Q(buyer=user) | Q(seller=user))
+                & ~Q(status__in=["CANCELLED", "CONFIRMED"])
+            )
+        ).count()
+
+        return Response(
+            {
+                "buyer": buyer_stats,
+                "seller": seller_stats,
+                "revenue": revenue,
+                "active_orders": active_orders,
+            }
+        )
