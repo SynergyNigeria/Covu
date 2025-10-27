@@ -30,15 +30,12 @@ def update_store_ratings(store):
     Args:
         store: Store instance to update
     """
-    # Get all approved ratings for this store
-    approved_ratings = Rating.objects.filter(store=store, is_approved=True)
+    # Get all ratings for this store (no moderation)
+    ratings = Rating.objects.filter(store=store)
 
     # Calculate statistics
-    stats = approved_ratings.aggregate(
-        avg_rating=Avg("rating"), total_reviews=Count("id")
-    )
+    stats = ratings.aggregate(avg_rating=Avg("rating"))
 
     # Update store
     store.average_rating = stats["avg_rating"] or 0.0
-    store.total_reviews = stats["total_reviews"] or 0
-    store.save(update_fields=["average_rating", "total_reviews"])
+    store.save(update_fields=["average_rating"])

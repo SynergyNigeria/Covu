@@ -48,7 +48,6 @@ class RatingViewSet(viewsets.ModelViewSet):
 
         Query params:
         - store: Filter by store ID
-        - approved_only: Show only approved ratings (default: true for public)
         """
         queryset = Rating.objects.select_related(
             "buyer", "order", "order__product", "store"
@@ -59,11 +58,7 @@ class RatingViewSet(viewsets.ModelViewSet):
         if store_id:
             queryset = queryset.filter(store_id=store_id)
 
-        # Filter by approval status (default to approved only for public listings)
-        approved_only = self.request.query_params.get("approved_only", "true").lower()
-        if approved_only == "true":
-            queryset = queryset.filter(is_approved=True)
-
+        # No moderation: show all ratings
         return queryset.order_by("-created_at")
 
     def create(self, request, *args, **kwargs):
@@ -80,8 +75,7 @@ class RatingViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         rating = serializer.save()
-
-        # Return full rating details
+        # No moderation: show all ratings
         output_serializer = RatingSerializer(rating)
 
         return Response(
@@ -103,10 +97,8 @@ class RatingViewSet(viewsets.ModelViewSet):
         """
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-
         return Response({"count": queryset.count(), "results": serializer.data})
 
-    @action(detail=False, methods=["get"], url_path="store/(?P<store_id>[^/.]+)/stats")
     def store_stats(self, request, store_id=None):
         """
         Get rating statistics for a store.
@@ -126,8 +118,8 @@ class RatingViewSet(viewsets.ModelViewSet):
                 {"error": "Store not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Get all approved ratings for this store
-        ratings = Rating.objects.filter(store=store, is_approved=True)
+        # Get all ratings for this store (no moderation)
+        ratings = Rating.objects.filter(store=store)
         total_ratings = ratings.count()
 
         if total_ratings == 0:

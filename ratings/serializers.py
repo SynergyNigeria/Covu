@@ -61,17 +61,22 @@ class CreateRatingSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        """Create rating and link to order/store"""
+        """Create rating, link to order/store, and auto-approve it"""
+        from django.utils import timezone
+
         order_id = validated_data.pop("order_id")
         order = Order.objects.select_related("product__store", "buyer").get(id=order_id)
 
-        # Create rating
+        # Create rating with auto-approval
         rating = Rating.objects.create(
             order=order,
             buyer=order.buyer,
             store=order.product.store,
             rating=validated_data["rating"],
             review=validated_data.get("review", ""),
+            is_approved=True,
+            approved_at=timezone.now(),
+            approved_by=None,
         )
 
         return rating
@@ -104,17 +109,8 @@ class RatingSerializer(serializers.ModelSerializer):
             "rating_text",
             "review",
             "created_at",
-            "is_approved",
         ]
-        read_only_fields = [
-            "id",
-            "buyer_name",
-            "order_number",
-            "product_name",
-            "rating_text",
-            "created_at",
-            "is_approved",
-        ]
+        read_only_fields = fields
 
 
 class StoreRatingStatsSerializer(serializers.Serializer):
