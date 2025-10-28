@@ -13,5 +13,11 @@ router = DefaultRouter()
 router.register(r"", RatingViewSet, basename="rating")
 
 urlpatterns = [
+    # Explicit store stats endpoint
+    path(
+        "store/<uuid:store_id>/stats/",
+        RatingViewSet.as_view({"get": "store_stats"}),
+        name="store-stats",
+    ),
     path("", include(router.urls)),
 ]
