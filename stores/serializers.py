@@ -29,6 +29,7 @@ class StoreListSerializer(serializers.ModelSerializer):
             "product_count",
             "delivery_within_lga",
             "delivery_outside_lga",
+            "delivery_outside_state",
             "is_active",
             "created_at",
             "updated_at",
@@ -68,6 +69,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             "product_count",
             "delivery_within_lga",
             "delivery_outside_lga",
+            "delivery_outside_state",
             "is_active",
             "created_at",
             "updated_at",
@@ -106,6 +108,7 @@ class StoreCreateUpdateSerializer(serializers.ModelSerializer):
             "city",
             "delivery_within_lga",
             "delivery_outside_lga",
+            "delivery_outside_state",
         ]
 
     def validate(self, attrs):
@@ -115,12 +118,14 @@ class StoreCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"delivery_within_lga": "Delivery fee must be positive"}
             )
-
         if attrs.get("delivery_outside_lga") and attrs["delivery_outside_lga"] < 0:
             raise serializers.ValidationError(
                 {"delivery_outside_lga": "Delivery fee must be positive"}
             )
-
+        if attrs.get("delivery_outside_state") and attrs["delivery_outside_state"] < 0:
+            raise serializers.ValidationError(
+                {"delivery_outside_state": "Delivery fee must be positive"}
+            )
         return attrs
 
     def create(self, validated_data):

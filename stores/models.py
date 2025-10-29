@@ -100,6 +100,12 @@ class Store(models.Model):
         default=2500.00,
         help_text="Delivery fee for buyers outside seller's city/LGA (₦)",
     )
+    delivery_outside_state = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=4000.00,
+        help_text="Delivery fee for buyers outside seller's state (₦)",
+    )
 
     # Status
     is_active = models.BooleanField(
