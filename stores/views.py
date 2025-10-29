@@ -132,13 +132,23 @@ class StoreViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        """Update store (full update)"""
+        """Update store (full update) with 60-day edit limit"""
+        from django.utils import timezone
+        from datetime import timedelta
+
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
+        # Enforce 60-day limit after last edit
+        if (timezone.now() - instance.updated_at) > timedelta(days=60):
+            return Response(
+                {
+                    "error": "You can only edit your store within 60 days of the last update. Please contact support if you need further changes."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         store = serializer.save()
-
         return Response(StoreDetailSerializer(store).data)
 
     def partial_update(self, request, *args, **kwargs):

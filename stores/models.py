@@ -4,6 +4,9 @@ from users.models import NIGERIAN_STATES
 from cloudinary.models import CloudinaryField
 import uuid
 
+# Import store categories for choices
+from .categories import STORE_CATEGORIES
+
 
 # ==============================================================================
 # STORE MODEL
@@ -45,12 +48,22 @@ class Store(models.Model):
         default="This will be a very great store.",
         help_text="Default description (editable later)",
     )
+    category = models.CharField(
+        max_length=50,
+        choices=STORE_CATEGORIES,
+        db_index=True,
+        default="other",
+        help_text="Store category for filtering (editable)",
+    )
     logo = CloudinaryField(
         "store_logos",
         blank=True,
         null=True,
         help_text="Default logo from Cloudinary (editable later)",
     )
+
+    # Removed dynamic assignment of choices
+    # Store._meta.get_field('category').choices = STORE_CATEGORIES
 
     # Location fields (for 40% algorithm weight - copied from user)
     state = models.CharField(

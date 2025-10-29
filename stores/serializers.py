@@ -20,6 +20,7 @@ class StoreListSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "category",
             "logo",
             "state",
             "city",
@@ -57,6 +58,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "category",
             "logo",
             "state",
             "city",
@@ -98,6 +100,7 @@ class StoreCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
+            "category",
             "logo",
             "state",
             "city",
