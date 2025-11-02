@@ -96,12 +96,38 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
-        """Update user profile"""
+        """Update user profile with timestamp tracking for rate-limited fields"""
+        from django.utils import timezone
+
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+
+        # Track which fields are being updated
+        location_updated = "state" in request.data or "city" in request.data
+        contact_updated = "phone_number" in request.data
+
+        # Perform the update
         self.perform_update(serializer)
+
+        # Update timestamps for rate-limited fields
+        now = timezone.now()
+        if location_updated:
+            instance.location_last_updated = now
+        if contact_updated:
+            instance.contact_last_updated = now
+
+        # Save timestamp updates if any
+        if location_updated or contact_updated:
+            instance.save(
+                update_fields=[
+                    field
+                    for field in ["location_last_updated", "contact_last_updated"]
+                    if (field == "location_last_updated" and location_updated)
+                    or (field == "contact_last_updated" and contact_updated)
+                ]
+            )
 
         # Return full profile after update
         profile_serializer = UserProfileSerializer(instance)

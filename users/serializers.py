@@ -104,6 +104,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """
 
     wallet_balance = serializers.SerializerMethodField()
+    can_update_location = serializers.SerializerMethodField()
+    can_update_contact = serializers.SerializerMethodField()
+    location_update_available_in_days = serializers.SerializerMethodField()
+    contact_update_available_in_days = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -118,8 +122,22 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "wallet_balance",
             "is_active",
             "date_joined",
+            "location_last_updated",
+            "contact_last_updated",
+            "can_update_location",
+            "can_update_contact",
+            "location_update_available_in_days",
+            "contact_update_available_in_days",
         )
-        read_only_fields = ("id", "email", "is_seller", "is_active", "date_joined")
+        read_only_fields = (
+            "id",
+            "email",
+            "is_seller",
+            "is_active",
+            "date_joined",
+            "location_last_updated",
+            "contact_last_updated",
+        )
 
     def get_wallet_balance(self, obj):
         """Get user's wallet balance"""
@@ -128,11 +146,75 @@ class UserProfileSerializer(serializers.ModelSerializer):
         except Exception:
             return 0.0
 
+    def get_can_update_location(self, obj):
+        """Check if user can update location (30-day limit)"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not obj.location_last_updated:
+            return True
+
+        now = timezone.now()
+        thirty_days = timedelta(days=30)
+        time_since_last_update = now - obj.location_last_updated
+
+        return time_since_last_update >= thirty_days
+
+    def get_can_update_contact(self, obj):
+        """Check if user can update contact (30-day limit)"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not obj.contact_last_updated:
+            return True
+
+        now = timezone.now()
+        thirty_days = timedelta(days=30)
+        time_since_last_update = now - obj.contact_last_updated
+
+        return time_since_last_update >= thirty_days
+
+    def get_location_update_available_in_days(self, obj):
+        """Calculate days remaining until location can be updated"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not obj.location_last_updated:
+            return 0
+
+        now = timezone.now()
+        thirty_days = timedelta(days=30)
+        time_since_last_update = now - obj.location_last_updated
+
+        if time_since_last_update >= thirty_days:
+            return 0
+
+        days_remaining = 30 - time_since_last_update.days
+        return max(0, days_remaining)
+
+    def get_contact_update_available_in_days(self, obj):
+        """Calculate days remaining until contact can be updated"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not obj.contact_last_updated:
+            return 0
+
+        now = timezone.now()
+        thirty_days = timedelta(days=30)
+        time_since_last_update = now - obj.contact_last_updated
+
+        if time_since_last_update >= thirty_days:
+            return 0
+
+        days_remaining = 30 - time_since_last_update.days
+        return max(0, days_remaining)
+
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating user profile.
-    Only allows updating certain fields.
+    Only allows updating certain fields with 30-day rate limiting for location and contact.
     """
 
     class Meta:
@@ -140,11 +222,13 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         fields = (
             "phone_number",
             "full_name",
+            "state",
             "city",
         )
         extra_kwargs = {
             "phone_number": {"required": False},
             "full_name": {"required": False},
+            "state": {"required": False},
             "city": {"required": False},
         }
 
@@ -154,6 +238,46 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         if CustomUser.objects.filter(phone_number=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("This phone number is already in use.")
         return value
+
+    def validate(self, attrs):
+        """
+        Validate 30-day rate limiting for location and contact updates.
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        user = self.context["request"].user
+        now = timezone.now()
+        thirty_days = timedelta(days=30)
+
+        # Check if location fields (state or city) are being updated
+        location_fields_updated = "state" in attrs or "city" in attrs
+        if location_fields_updated:
+            # Check if user has updated location before
+            if user.location_last_updated:
+                time_since_last_update = now - user.location_last_updated
+                if time_since_last_update < thirty_days:
+                    days_remaining = 30 - time_since_last_update.days
+                    raise serializers.ValidationError(
+                        {
+                            "location": f"You can only update your location once every 30 days. Please wait {days_remaining} more day(s)."
+                        }
+                    )
+
+        # Check if contact field (phone_number) is being updated
+        if "phone_number" in attrs:
+            # Check if user has updated contact before
+            if user.contact_last_updated:
+                time_since_last_update = now - user.contact_last_updated
+                if time_since_last_update < thirty_days:
+                    days_remaining = 30 - time_since_last_update.days
+                    raise serializers.ValidationError(
+                        {
+                            "phone_number": f"You can only update your phone number once every 30 days. Please wait {days_remaining} more day(s)."
+                        }
+                    )
+
+        return attrs
 
 
 class PasswordChangeSerializer(serializers.Serializer):

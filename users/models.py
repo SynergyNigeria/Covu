@@ -174,6 +174,18 @@ class CustomUser(AbstractUser):
         help_text="True when user creates a store. Everyone is a buyer by default.",
     )
 
+    # Rate limiting fields for profile updates
+    location_last_updated = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time user updated state/city (30-day limit to prevent abuse)",
+    )
+    contact_last_updated = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time user updated phone_number (30-day limit to prevent abuse)",
+    )
+
     # Timestamps (inherited from AbstractUser, but good to document)
     # date_joined - auto-populated on creation
     # last_login - auto-populated on login
@@ -199,6 +211,8 @@ class CustomUser(AbstractUser):
                 fields=["state", "city"]
             ),  # Composite index for combined queries
             models.Index(fields=["is_seller"]),
+            models.Index(fields=["location_last_updated"]),
+            models.Index(fields=["contact_last_updated"]),
         ]
 
     def __str__(self):
