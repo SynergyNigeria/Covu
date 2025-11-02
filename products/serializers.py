@@ -91,6 +91,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "name": store.name,
             "description": store.description,
             "logo": store.logo.url if store.logo else None,
+            "seller_photo": store.seller_photo.url if store.seller_photo else None,
             "city": store.city,
             "state": store.state,
             "average_rating": float(store.average_rating),

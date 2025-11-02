@@ -13,6 +13,8 @@ class StoreListSerializer(serializers.ModelSerializer):
     """
 
     seller_name = serializers.CharField(source="seller.full_name", read_only=True)
+    logo = serializers.SerializerMethodField()
+    seller_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = Store
@@ -22,6 +24,7 @@ class StoreListSerializer(serializers.ModelSerializer):
             "description",
             "category",
             "logo",
+            "seller_photo",
             "state",
             "city",
             "seller_name",
@@ -42,6 +45,14 @@ class StoreListSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def get_logo(self, obj):
+        """Return full Cloudinary URL for logo"""
+        return obj.logo_url
+
+    def get_seller_photo(self, obj):
+        """Return full Cloudinary URL for seller photo"""
+        return obj.seller_photo_url
+
 
 class StoreDetailSerializer(serializers.ModelSerializer):
     """
@@ -52,6 +63,8 @@ class StoreDetailSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source="seller.full_name", read_only=True)
     seller_email = serializers.EmailField(source="seller.email", read_only=True)
     products = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
+    seller_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = Store
@@ -61,6 +74,7 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             "description",
             "category",
             "logo",
+            "seller_photo",
             "state",
             "city",
             "seller_name",
@@ -83,6 +97,14 @@ class StoreDetailSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def get_logo(self, obj):
+        """Return full Cloudinary URL for logo"""
+        return obj.logo_url
+
+    def get_seller_photo(self, obj):
+        """Return full Cloudinary URL for seller photo"""
+        return obj.seller_photo_url
+
     def get_products(self, obj):
         """Get active products for this store"""
         from products.serializers import ProductListSerializer
@@ -97,6 +119,11 @@ class StoreCreateUpdateSerializer(serializers.ModelSerializer):
     Seller can only modify their own stores.
     """
 
+    logo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    seller_photo = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
     class Meta:
         model = Store
         fields = [
@@ -104,6 +131,7 @@ class StoreCreateUpdateSerializer(serializers.ModelSerializer):
             "description",
             "category",
             "logo",
+            "seller_photo",
             "state",
             "city",
             "delivery_within_lga",
@@ -126,6 +154,56 @@ class StoreCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"delivery_outside_state": "Delivery fee must be positive"}
             )
+
+        # Handle Cloudinary URLs - extract public_id from full URLs
+        if (
+            attrs.get("logo")
+            and isinstance(attrs["logo"], str)
+            and attrs["logo"].startswith("http")
+        ):
+            # Extract public_id from Cloudinary URL
+            # Format: https://res.cloudinary.com/dpmxcjkfl/image/upload/v123456/folder/public_id.jpg
+            try:
+                parts = attrs["logo"].split("/upload/")
+                if len(parts) == 2:
+                    # Get everything after '/upload/' and before extension
+                    path_with_version = parts[1]
+                    # Remove version number (v1234567/)
+                    if path_with_version.startswith("v"):
+                        path_parts = path_with_version.split("/", 1)
+                        if len(path_parts) == 2:
+                            attrs["logo"] = path_parts[1].rsplit(".", 1)[
+                                0
+                            ]  # Remove extension
+                        else:
+                            attrs["logo"] = path_with_version.rsplit(".", 1)[0]
+                    else:
+                        attrs["logo"] = path_with_version.rsplit(".", 1)[0]
+            except Exception as e:
+                # If parsing fails, keep the original URL
+                pass
+
+        if (
+            attrs.get("seller_photo")
+            and isinstance(attrs["seller_photo"], str)
+            and attrs["seller_photo"].startswith("http")
+        ):
+            # Extract public_id from Cloudinary URL
+            try:
+                parts = attrs["seller_photo"].split("/upload/")
+                if len(parts) == 2:
+                    path_with_version = parts[1]
+                    if path_with_version.startswith("v"):
+                        path_parts = path_with_version.split("/", 1)
+                        if len(path_parts) == 2:
+                            attrs["seller_photo"] = path_parts[1].rsplit(".", 1)[0]
+                        else:
+                            attrs["seller_photo"] = path_with_version.rsplit(".", 1)[0]
+                    else:
+                        attrs["seller_photo"] = path_with_version.rsplit(".", 1)[0]
+            except Exception as e:
+                pass
+
         return attrs
 
     def create(self, validated_data):

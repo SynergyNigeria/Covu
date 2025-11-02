@@ -135,17 +135,54 @@ class StoreViewSet(viewsets.ModelViewSet):
         """Update store (full update) with 60-day edit limit"""
         from django.utils import timezone
         from datetime import timedelta
+        import cloudinary.uploader
 
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        # Enforce 60-day limit after last edit
-        if (timezone.now() - instance.updated_at) > timedelta(days=60):
-            return Response(
-                {
-                    "error": "You can only edit your store within 60 days of the last update. Please contact support if you need further changes."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+
+        # Check if this is an image-only update (logo or seller_photo)
+        is_image_only_update = set(request.data.keys()).issubset(
+            {"logo", "seller_photo"}
+        )
+
+        # Enforce 60-day lock: After ANY edit, user must wait 60 days before editing again
+        # Images can ALWAYS be updated (not affected by lock)
+        if not is_image_only_update and instance.updated_at != instance.created_at:
+            days_since_update = (timezone.now() - instance.updated_at).days
+
+            if days_since_update < 60:
+                # LOCKED: Less than 60 days have passed since last edit
+                days_left = 60 - days_since_update
+                return Response(
+                    {
+                        "error": f"Store details are locked. You can edit again in {days_left} day{'s' if days_left != 1 else ''}. Images can be updated anytime.",
+                        "days_since_update": days_since_update,
+                        "days_left": days_left,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # Delete old images from Cloudinary before updating
+        if "logo" in request.data and instance.logo:
+            try:
+                # Extract public_id from old logo
+                old_public_id = str(instance.logo)
+                if old_public_id and old_public_id != "image/upload/":
+                    cloudinary.uploader.destroy(old_public_id, invalidate=True)
+                    print(f"Deleted old logo: {old_public_id}")
+            except Exception as e:
+                print(f"Failed to delete old logo: {e}")
+
+        if "seller_photo" in request.data and instance.seller_photo:
+            try:
+                # Extract public_id from old seller photo
+                old_public_id = str(instance.seller_photo)
+                if old_public_id and old_public_id != "image/upload/":
+                    cloudinary.uploader.destroy(old_public_id, invalidate=True)
+                    print(f"Deleted old seller photo: {old_public_id}")
+            except Exception as e:
+                print(f"Failed to delete old seller photo: {e}")
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         store = serializer.save()
@@ -177,3 +214,77 @@ class StoreViewSet(viewsets.ModelViewSet):
         serializer = StoreListSerializer(stores, many=True)
 
         return Response({"count": stores.count(), "results": serializer.data})
+
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
+    def upload_image(self, request):
+        """
+        Upload image to Cloudinary and return URL.
+        Handles both store logos and seller photos.
+        """
+        try:
+            from cloudinary.uploader import upload as cloudinary_upload
+
+            # Get uploaded file
+            uploaded_file = request.FILES.get("file")
+            if not uploaded_file:
+                return Response(
+                    {"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate file size (max 5MB)
+            if uploaded_file.size > 5 * 1024 * 1024:
+                return Response(
+                    {"error": "File size must be less than 5MB"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate file type
+            allowed_types = [
+                "image/jpeg",
+                "image/jpg",
+                "image/png",
+                "image/gif",
+                "image/webp",
+            ]
+            if uploaded_file.content_type not in allowed_types:
+                return Response(
+                    {"error": "Invalid file type. Only images are allowed."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Get folder from request (store_logos or seller_photos)
+            folder = request.data.get("folder", "store_images")
+
+            # Upload to Cloudinary
+            upload_result = cloudinary_upload(
+                uploaded_file,
+                folder=folder,
+                resource_type="image",
+                overwrite=True,
+                invalidate=True,
+            )
+
+            # Return the secure URL
+            return Response(
+                {
+                    "url": upload_result["secure_url"],
+                    "public_id": upload_result["public_id"],
+                    "success": True,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ImportError:
+            logger.error("Cloudinary not properly configured")
+            return Response(
+                {
+                    "error": "Image upload service not configured. Please contact support."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            logger.error(f"Error uploading image to Cloudinary: {str(e)}")
+            return Response(
+                {"error": f"Upload failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

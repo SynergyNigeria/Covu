@@ -25,8 +25,9 @@ class Store(models.Model):
     Location (state + city) used for 40% of listing algorithm weight.
     """
 
-    # Default store logo from Cloudinary
+    # Default images from Cloudinary
     DEFAULT_LOGO_URL = "https://res.cloudinary.com/dpmxcjkfl/image/upload/v1760726056/samples/ecommerce/leather-bag-gray.jpg"
+    DEFAULT_SELLER_PHOTO_URL = "https://res.cloudinary.com/dpmxcjkfl/image/upload/v1762100746/covu-flyer_hotir6.png"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -59,7 +60,13 @@ class Store(models.Model):
         "store_logos",
         blank=True,
         null=True,
-        help_text="Default logo from Cloudinary (editable later)",
+        help_text="Store logo/brand image (editable later)",
+    )
+    seller_photo = CloudinaryField(
+        "seller_photos",
+        blank=True,
+        null=True,
+        help_text="Seller's profile photo for transparency (editable later)",
     )
 
     # Removed dynamic assignment of choices
@@ -141,9 +148,22 @@ class Store(models.Model):
     @property
     def logo_url(self):
         """Return logo URL or default."""
-        if self.logo:
-            return self.logo.url
+        try:
+            if self.logo:
+                return self.logo.url
+        except (AttributeError, ValueError):
+            pass
         return self.DEFAULT_LOGO_URL
+
+    @property
+    def seller_photo_url(self):
+        """Return seller photo URL or default."""
+        try:
+            if self.seller_photo:
+                return self.seller_photo.url
+        except (AttributeError, ValueError):
+            pass
+        return self.DEFAULT_SELLER_PHOTO_URL
 
     @property
     def is_new(self):
