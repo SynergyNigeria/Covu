@@ -145,9 +145,14 @@ class StoreViewSet(viewsets.ModelViewSet):
             {"logo", "seller_photo"}
         )
 
+        # Check if store has been genuinely edited (not just created)
+        # Allow small time difference (< 5 seconds) to account for microsecond differences
+        time_diff = abs((instance.updated_at - instance.created_at).total_seconds())
+        has_been_edited = time_diff > 5  # More than 5 seconds means it was edited
+
         # Enforce 60-day lock: After ANY edit, user must wait 60 days before editing again
         # Images can ALWAYS be updated (not affected by lock)
-        if not is_image_only_update and instance.updated_at != instance.created_at:
+        if not is_image_only_update and has_been_edited:
             days_since_update = (timezone.now() - instance.updated_at).days
 
             if days_since_update < 60:

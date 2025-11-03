@@ -127,9 +127,42 @@ class ProductViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
-        """Update product (full update)"""
+        """
+        Update product (full update).
+        Handles image replacement by deleting old image from Cloudinary.
+        """
+        import cloudinary.uploader
+
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
+
+        # Check if new image is being uploaded
+        new_image = request.data.get("images")
+        old_image = instance.images
+
+        # If new image provided and old image exists, delete old one from Cloudinary
+        if new_image and old_image:
+            try:
+                # Extract public_id from Cloudinary URL
+                image_url = (
+                    old_image.url if hasattr(old_image, "url") else str(old_image)
+                )
+                if "cloudinary.com" in image_url:
+                    parts = image_url.split("/")
+                    if len(parts) > 7:
+                        # Get public_id (includes folder path)
+                        public_id_with_ext = "/".join(parts[7:])
+                        # Remove file extension
+                        public_id = public_id_with_ext.rsplit(".", 1)[0]
+                        # Delete from Cloudinary
+                        cloudinary.uploader.destroy(public_id)
+                        logger.info(
+                            f"Deleted old product image from Cloudinary: {public_id}"
+                        )
+            except Exception as e:
+                # Log error but don't fail the update
+                logger.error(f"Failed to delete old product image from Cloudinary: {e}")
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         product = serializer.save()
@@ -145,14 +178,44 @@ class ProductViewSet(viewsets.ModelViewSet):
         """
         Soft delete product (set is_active=False).
         Hard delete not allowed to preserve order history.
+        Also deletes product images from Cloudinary.
         """
+        import cloudinary.uploader
+
         instance = self.get_object()
+
+        # Delete images from Cloudinary
+        if instance.images:
+            try:
+                # Extract public_id from Cloudinary URL
+                image_url = (
+                    instance.images.url
+                    if hasattr(instance.images, "url")
+                    else str(instance.images)
+                )
+                # Extract public_id from URL format: https://res.cloudinary.com/{cloud_name}/image/upload/{version}/{public_id}.{format}
+                if "cloudinary.com" in image_url:
+                    parts = image_url.split("/")
+                    if len(parts) > 7:
+                        # Get public_id (includes folder path)
+                        public_id_with_ext = "/".join(parts[7:])
+                        # Remove file extension
+                        public_id = public_id_with_ext.rsplit(".", 1)[0]
+                        # Delete from Cloudinary
+                        cloudinary.uploader.destroy(public_id)
+                        logger.info(
+                            f"Deleted product image from Cloudinary: {public_id}"
+                        )
+            except Exception as e:
+                # Log error but don't fail the deletion
+                logger.error(f"Failed to delete product image from Cloudinary: {e}")
+
         instance.is_active = False
         instance.save()
 
         return Response(
             {"message": "Product deactivated successfully"},
-            status=status.HTTP_204_NO_CONTENT,
+            status=status.HTTP_200_OK,
         )
 
     @action(detail=False, methods=["get"])
