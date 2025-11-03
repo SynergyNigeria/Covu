@@ -27,26 +27,44 @@ class OrderSellerSerializer(serializers.ModelSerializer):
 
 
 class OrderProductSerializer(serializers.ModelSerializer):
-    """Minimal product info for order"""
+    """
+    Minimal product info for order.
+    Note: This is used in OrderDetailSerializer which includes nested product data.
+    For snapshot data, OrderListSerializer uses the snapshot fields directly from Order model.
+    """
 
     store_name = serializers.CharField(source="store.name", read_only=True)
+    images = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = ["id", "name", "images", "category", "store_name"]
-        read_only_fields = fields
+        read_only_fields = ["id", "name", "category", "store_name"]
+
+    def get_images(self, obj):
+        """Return full Cloudinary URL for product images"""
+        try:
+            if obj.images:
+                return obj.images.url
+        except:
+            pass
+        return None
 
 
 class OrderListSerializer(serializers.ModelSerializer):
     """
     Serializer for order list view.
     Shows essential order info for browsing.
+    Uses snapshot fields to show product as it was at order time.
     """
 
     buyer_name = serializers.CharField(source="buyer.full_name", read_only=True)
     seller_name = serializers.CharField(source="seller.full_name", read_only=True)
-    product_name = serializers.CharField(source="product.name", read_only=True)
-    product_images = serializers.ImageField(source="product.images", read_only=True)
+    # Use snapshot fields instead of current product data
+    product_name = serializers.CharField(source="product_name_snapshot", read_only=True)
+    product_images = serializers.CharField(
+        source="product_image_snapshot", read_only=True
+    )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
@@ -70,12 +88,14 @@ class OrderListSerializer(serializers.ModelSerializer):
 class OrderDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for order detail view.
-    Includes complete nested data (buyer, seller, product).
+    Includes complete nested data (buyer, seller) and snapshot product data.
     """
 
     buyer = OrderBuyerSerializer(read_only=True)
     seller = OrderSellerSerializer(read_only=True)
-    product = OrderProductSerializer(read_only=True)
+
+    # Use snapshot fields for product details
+    product_snapshot = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     # Escrow info
@@ -89,7 +109,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "order_number",
             "buyer",
             "seller",
-            "product",
+            "product_snapshot",
             "quantity",
             "product_price",
             "delivery_fee",
@@ -108,6 +128,17 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "cancellation_reason",
         ]
         read_only_fields = fields
+
+    def get_product_snapshot(self, obj):
+        """Return snapshot of product as it was at order time"""
+        return {
+            "id": str(obj.product.id),
+            "name": obj.product_name_snapshot or obj.product.name,
+            "images": obj.product_image_snapshot
+            or (obj.product.images.url if obj.product.images else None),
+            "category": obj.product_category_snapshot or obj.product.category,
+            "store_name": obj.product.store.name,
+        }
 
     def get_escrow_status(self, obj):
         """Get escrow transaction status"""

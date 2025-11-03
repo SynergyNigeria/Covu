@@ -129,7 +129,7 @@ class OrderService:
         logger.info(f"Debited ₦{total_amount:.2f} from buyer {buyer.email} wallet")
         logger.info(f"Wallet balance: ₦{balance_before:.2f} → ₦{balance_after:.2f}")
 
-        # 4. Create Order (status=PENDING)
+        # 4. Create Order (status=PENDING) with product snapshot
         order = Order.objects.create(
             buyer=buyer,
             seller=seller,
@@ -139,6 +139,10 @@ class OrderService:
             total_amount=total_amount,
             delivery_address=delivery_address,
             status="PENDING",
+            # Snapshot product details at order time
+            product_name_snapshot=product.name,
+            product_image_snapshot=product.images.url if product.images else "",
+            product_category_snapshot=product.category,
         )
 
         logger.info(f"Order created: {order.order_number}")

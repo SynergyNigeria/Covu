@@ -85,6 +85,26 @@ class Order(models.Model):
         help_text="Full delivery address provided by buyer"
     )
 
+    # Product snapshot fields (preserve what buyer actually ordered)
+    product_name_snapshot = models.CharField(
+        max_length=200,
+        help_text="Product name at time of order (snapshot)",
+        blank=True,
+        default="",
+    )
+    product_image_snapshot = models.URLField(
+        max_length=500,
+        help_text="Product image URL at time of order (snapshot)",
+        blank=True,
+        default="",
+    )
+    product_category_snapshot = models.CharField(
+        max_length=50,
+        help_text="Product category at time of order (snapshot)",
+        blank=True,
+        default="",
+    )
+
     # Status & Tracking
     status = models.CharField(
         max_length=20,
