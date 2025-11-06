@@ -371,9 +371,14 @@ class VerifyPaymentView(APIView):
     Verifies payment status with Paystack and credits wallet if successful.
 
     Useful as fallback if webhook fails.
+
+    UPDATED: Authentication is optional - the reference contains user_id in metadata
+    This prevents auto-logout issues when user returns from Paystack after token expiry.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = (
+        []
+    )  # No authentication required - we verify via reference metadata
 
     def get(self, request, reference):
         from django.conf import settings
@@ -420,20 +425,33 @@ class VerifyPaymentView(APIView):
 
             amount = Decimal(str(amount_in_kobo / 100))
 
-            # Verify user owns this transaction
+            # Get user from metadata (not from request.user since auth is optional)
             user_id = metadata.get("user_id")
-            if str(request.user.id) != str(user_id):
-                logger.warning(
-                    f"User {request.user.id} trying to verify payment for user {user_id}"
+            wallet_id = metadata.get("wallet_id")
+
+            if not user_id or not wallet_id:
+                logger.error(
+                    f"Missing user_id or wallet_id in payment metadata: {reference}"
                 )
                 return Response(
-                    {"status": "error", "message": "Unauthorized"},
-                    status=status.HTTP_403_FORBIDDEN,
+                    {"status": "error", "message": "Invalid payment reference"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            # If user is authenticated, verify they own this transaction
+            if request.user.is_authenticated:
+                if str(request.user.id) != str(user_id):
+                    logger.warning(
+                        f"Authenticated user {request.user.id} trying to verify payment for user {user_id}"
+                    )
+                    return Response(
+                        {"status": "error", "message": "Unauthorized"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
 
             # Credit wallet
             with transaction.atomic():
-                wallet = request.user.wallet
+                wallet = Wallet.objects.select_for_update().get(id=wallet_id)
 
                 # Check if already processed
                 existing = WalletTransaction.objects.filter(
@@ -462,8 +480,9 @@ class VerifyPaymentView(APIView):
                     description=f"Wallet funding via Paystack (manual verification) - {reference}",
                 )
 
+                user_email = wallet.user.email
                 logger.info(
-                    f"Wallet credited (manual): {request.user.email} - ₦{amount:,.2f} - Ref: {reference}"
+                    f"Wallet credited (manual): {user_email} - ₦{amount:,.2f} - Ref: {reference}"
                 )
 
                 # Send email notification
@@ -471,7 +490,7 @@ class VerifyPaymentView(APIView):
                     from notifications.email_service import EmailNotificationService
 
                     EmailNotificationService.send_wallet_funded(
-                        user=request.user, amount=amount, reference=reference
+                        user=wallet.user, amount=amount, reference=reference
                     )
                 except Exception as e:
                     logger.error(f"Failed to send email notification: {e}")
