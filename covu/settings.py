@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "wallets.apps.WalletsConfig",
     "ratings.apps.RatingsConfig",
     "notifications.apps.NotificationsConfig",
+    "complaints.apps.ComplaintsConfig",
 ]
 
 MIDDLEWARE = [
