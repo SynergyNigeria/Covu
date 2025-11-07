@@ -569,3 +569,57 @@ if SENTRY_DSN:
     )
 else:
     print("⚠️  Sentry DSN not found in .env - Error monitoring disabled")
+
+
+# ==============================================================================
+# EMAIL CONFIGURATION
+# ==============================================================================
+
+# Email backend - read from .env (allows testing real emails in development)
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
+)
+
+# Log which backend is being used
+if EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
+    print("📧 Email Backend: Console (Development Mode)")
+else:
+    print("📧 Email Backend: SMTP (Live Email Mode)")
+
+# SMTP Configuration
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+
+# SSL certificate verification (disable in development if needed)
+if DEBUG:
+    import ssl
+
+    EMAIL_SSL_CERTFILE = None
+    EMAIL_SSL_KEYFILE = None
+    # Create unverified SSL context for development
+    try:
+        import ssl
+
+        ssl._create_default_https_context = ssl._create_unverified_context
+    except:
+        pass
+
+# Default "from" email address
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL", default="COVU Marketplace <noreply@covu.ng>"
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Admin emails (for error notifications)
+ADMINS = [
+    ("COVU Admin", config("ADMIN_EMAIL", default="admin@covu.ng")),
+]
+
+# Email timeout (seconds)
+EMAIL_TIMEOUT = 10
+
+print(f"📧 Email configured: {DEFAULT_FROM_EMAIL}")

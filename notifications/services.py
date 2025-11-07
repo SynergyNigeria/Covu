@@ -3,15 +3,17 @@ Notification Service Layer for COVU Marketplace.
 
 This module handles all notification logic for the platform.
 
-Current Implementation: Console logging (placeholder)
+Current Implementation: Email notifications + Console logging
 Future: WhatsApp Business API integration
 
 When WhatsApp API is ready, update the _send_via_whatsapp() method
-with actual API calls. The rest of the code remains unchanged.
+with actual API calls.
 """
 
 from django.utils import timezone
+from django.conf import settings
 from .models import Notification
+from .email_service import EmailNotificationService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -276,23 +278,98 @@ class NotificationService:
         """
         Send notification via configured method.
 
-        Current: Console logging (placeholder)
+        Current: Email notifications (async via Celery)
         Future: WhatsApp Business API
 
         Args:
             notification: Notification object
         """
-        # PLACEHOLDER: Console logging
-        # When WhatsApp API is ready, replace this with API call
-        NotificationService._send_via_console(notification)
+        # Send email notification asynchronously
+        NotificationService._send_via_email(notification)
 
-        # TODO: When WhatsApp API ready, uncomment and implement
+        # Console logging only in DEBUG mode (for monitoring, not delivery)
+        if settings.DEBUG:
+            NotificationService._log_to_console(notification)
+
+        # TODO: When WhatsApp API ready, add WhatsApp notification
         # NotificationService._send_via_whatsapp(notification)
 
     @staticmethod
-    def _send_via_console(notification):
+    def _send_via_email(notification):
         """
-        Placeholder: Log notification to console.
+        Send notification via email using Celery async tasks.
+
+        Args:
+            notification: Notification object
+        """
+        try:
+            from .tasks import send_order_notification_email_task
+
+            # Send email asynchronously using Celery
+            send_order_notification_email_task.delay(
+                notification_type=notification.notification_type,
+                order_id=str(notification.order.id) if notification.order else None,
+                user_id=notification.user.id,
+            )
+
+            notification.delivery_method = "EMAIL"
+            notification.save()  # Save delivery method immediately
+            logger.info(
+                f"Email notification queued for async sending: {notification.notification_type}"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to queue email notification: {str(e)}")
+            # Fallback: Try sending synchronously
+            try:
+                from .email_service import EmailNotificationService
+
+                # Route to appropriate email method based on notification type
+                if notification.notification_type == "ORDER_CREATED":
+                    EmailNotificationService.send_order_created_to_seller(
+                        notification.order
+                    )
+                elif notification.notification_type == "ORDER_ACCEPTED":
+                    EmailNotificationService.send_order_accepted_to_buyer(
+                        notification.order
+                    )
+                elif notification.notification_type == "ORDER_DELIVERED":
+                    EmailNotificationService.send_order_delivered_to_buyer(
+                        notification.order
+                    )
+                elif notification.notification_type == "PAYMENT_RECEIVED":
+                    EmailNotificationService.send_order_confirmed_to_seller(
+                        notification.order
+                    )
+                elif notification.notification_type == "ORDER_CANCELLED":
+                    if notification.user == notification.order.buyer:
+                        EmailNotificationService.send_order_cancelled_to_buyer(
+                            order=notification.order,
+                            reason=notification.order.cancellation_reason,
+                        )
+                    else:
+                        EmailNotificationService.send_order_cancelled_to_seller(
+                            order=notification.order,
+                            reason=notification.order.cancellation_reason,
+                        )
+
+                notification.delivery_method = "EMAIL"
+                notification.save()  # Save after sync send
+                logger.info(
+                    f"Email sent synchronously (fallback): {notification.notification_type}"
+                )
+
+            except Exception as fallback_error:
+                logger.error(
+                    f"Fallback email sending also failed: {str(fallback_error)}"
+                )
+                notification.delivery_method = "CONSOLE"
+                notification.save()  # Save console fallback
+
+    @staticmethod
+    def _log_to_console(notification):
+        """
+        Log notification to console for debugging (does NOT set delivery method).
 
         Args:
             notification: Notification object
@@ -305,9 +382,6 @@ class NotificationService:
         print("-" * 60)
         print(notification.message)
         print("=" * 60 + "\n")
-
-        # Update delivery method
-        notification.delivery_method = "CONSOLE"
 
     @staticmethod
     def _send_via_whatsapp(notification):

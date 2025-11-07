@@ -20,7 +20,7 @@ class EmailNotificationService:
 
     @staticmethod
     def _send_email(
-        subject: str, message: str, recipient_list: list, fail_silently: bool = True
+        subject: str, message: str, recipient_list: list, fail_silently: bool = False
     ):
         """
         Internal method to send emails with error handling
@@ -29,7 +29,7 @@ class EmailNotificationService:
             subject: Email subject
             message: Email body
             recipient_list: List of recipient email addresses
-            fail_silently: Whether to suppress errors (default: True)
+            fail_silently: Whether to suppress errors (default: False for production)
         """
         try:
             result = send_mail(
@@ -77,9 +77,12 @@ Great news! You have a new order on COVU Marketplace.
 📦 ORDER DETAILS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Order Number: #{order.order_number}
-Amount: ₦{order.total_amount:,.2f}
+Product: {order.product.name}
+Quantity: {order.quantity}
+Product Price: ₦{order.product_price:,.2f}
+Delivery Fee: ₦{order.delivery_fee:,.2f}
+Total Amount: ₦{order.total_amount:,.2f}
 Buyer: {order.buyer.full_name}
-Items: {order.items.count()} product(s)
 Status: Pending (Awaiting your acceptance)
 
 � DELIVERY INSTRUCTIONS:
@@ -88,6 +91,7 @@ Status: Pending (Awaiting your acceptance)
 👤 BUYER CONTACT:
 Name: {order.buyer.full_name}
 Phone: {order.buyer.phone_number}
+Email: {order.buyer.email}
 Location: {order.buyer.city}, {order.buyer.get_state_display()}
 
 �🔔 ACTION REQUIRED:
@@ -253,36 +257,39 @@ For support: support@covu.ng
         )
 
     @staticmethod
-    def send_order_cancelled(
-        order, recipient_email: str, recipient_name: str, reason: Optional[str] = None
-    ):
+    def send_order_cancelled_to_buyer(order, reason: Optional[str] = None):
         """
-        Notify user when order is cancelled
+        Notify buyer when order is cancelled
 
         Args:
             order: Order instance
-            recipient_email: Email address of recipient
-            recipient_name: Name of recipient
             reason: Optional cancellation reason
         """
         subject = f"❌ Order #{order.order_number} Cancelled - COVU"
 
+        cancelled_by_seller = order.cancelled_by == "SELLER"
         reason_text = f"\n\nReason: {reason}" if reason else ""
 
-        message = f"""
-Hi {recipient_name},
+        if cancelled_by_seller:
+            cancellation_message = f"The seller has cancelled your order.{reason_text}"
+        else:
+            cancellation_message = f"You have cancelled this order.{reason_text}"
 
-Your order has been cancelled.{reason_text}
+        message = f"""
+Hi {order.buyer.full_name},
+
+{cancellation_message}
 
 📦 ORDER DETAILS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Order Number: #{order.order_number}
+Product: {order.product.name}
 Amount: ₦{order.total_amount:,.2f}
 Status: Cancelled ❌
 
 💰 REFUND INFORMATION:
-If payment was made, a full refund of ₦{order.total_amount:,.2f} has been 
-processed to your COVU wallet.
+A full refund of ₦{order.total_amount:,.2f} has been processed to your COVU wallet.
+New Wallet Balance: ₦{order.buyer.wallet.balance:,.2f}
 
 👉 View your wallet: https://covu.ng/dashboard/wallet
 👉 View order details: https://covu.ng/orders/{order.id}
@@ -300,7 +307,62 @@ For support: support@covu.ng
         """
 
         EmailNotificationService._send_email(
-            subject=subject, message=message, recipient_list=[recipient_email]
+            subject=subject, message=message, recipient_list=[order.buyer.email]
+        )
+
+    @staticmethod
+    def send_order_cancelled_to_seller(order, reason: Optional[str] = None):
+        """
+        Notify seller when order is cancelled
+
+        Args:
+            order: Order instance
+            reason: Optional cancellation reason
+        """
+        subject = f"❌ Order #{order.order_number} Cancelled - COVU"
+
+        cancelled_by_buyer = order.cancelled_by == "BUYER"
+        reason_text = f"\n\nReason: {reason}" if reason else ""
+
+        if cancelled_by_buyer:
+            cancellation_message = f"The buyer has cancelled their order.{reason_text}"
+        else:
+            cancellation_message = f"You have cancelled this order.{reason_text}"
+
+        message = f"""
+Hi {order.seller.full_name},
+
+{cancellation_message}
+
+📦 ORDER DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Order Number: #{order.order_number}
+Product: {order.product.name}
+Amount: ₦{order.total_amount:,.2f}
+Buyer: {order.buyer.full_name}
+Status: Cancelled ❌
+
+ℹ️ PAYMENT STATUS:
+The buyer has been refunded ₦{order.total_amount:,.2f} to their wallet.
+No payment will be released for this order.
+
+👉 View order details: https://covu.ng/orders/{order.id}
+👉 View your sales: https://covu.ng/dashboard/sales
+
+If you have any questions about this cancellation, please contact our support team.
+
+Thank you for your understanding.
+
+Best regards,
+The COVU Team
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is an automated message from COVU Marketplace.
+For support: support@covu.ng
+        """
+
+        EmailNotificationService._send_email(
+            subject=subject, message=message, recipient_list=[order.seller.email]
         )
 
     # ============================================================================
