@@ -79,7 +79,7 @@ class OrderListSerializer(serializers.ModelSerializer):
             "total_amount",
             "status",
             "status_display",
-            "delivery_address",
+            "delivery_message",
             "created_at",
         ]
         read_only_fields = fields
@@ -116,7 +116,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "total_amount",
             "status",
             "status_display",
-            "delivery_address",
+            "delivery_message",
             "escrow_status",
             "escrow_amount",
             "created_at",
@@ -162,8 +162,8 @@ class OrderCreateSerializer(serializers.Serializer):
     """
 
     product_id = serializers.UUIDField(required=True)
-    delivery_address = serializers.CharField(
-        required=True, max_length=500, help_text="Complete delivery address"
+    delivery_message = serializers.CharField(
+        required=True, max_length=500, help_text="Delivery instructions and address"
     )
 
     def validate_product_id(self, value):
@@ -175,10 +175,10 @@ class OrderCreateSerializer(serializers.Serializer):
 
         return value
 
-    def validate_delivery_address(self, value):
-        """Ensure delivery address is not empty"""
+    def validate_delivery_message(self, value):
+        """Ensure delivery message is not empty"""
         if not value.strip():
-            raise serializers.ValidationError("Delivery address cannot be empty")
+            raise serializers.ValidationError("Delivery message cannot be empty")
 
         return value.strip()
 

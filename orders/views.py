@@ -133,13 +133,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         Body:
             - product_id: UUID of product to order
-            - delivery_address: Complete delivery address
+            - delivery_message: Delivery instructions and address
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         product_id = serializer.validated_data["product_id"]
-        delivery_address = serializer.validated_data["delivery_address"]
+        delivery_message = serializer.validated_data["delivery_message"]
 
         # Get product
         product = get_object_or_404(Product, id=product_id, is_active=True)
@@ -154,7 +154,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         try:
             # Create order using service layer
             order = OrderService.create_order(
-                buyer=request.user, product=product, delivery_address=delivery_address
+                buyer=request.user, product=product, delivery_message=delivery_message
             )
 
             logger.info(f"Order created: {order.order_number} by {request.user.email}")

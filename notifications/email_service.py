@@ -82,7 +82,15 @@ Buyer: {order.buyer.full_name}
 Items: {order.items.count()} product(s)
 Status: Pending (Awaiting your acceptance)
 
-🔔 ACTION REQUIRED:
+� DELIVERY INSTRUCTIONS:
+{order.delivery_message}
+
+👤 BUYER CONTACT:
+Name: {order.buyer.full_name}
+Phone: {order.buyer.phone_number}
+Location: {order.buyer.city}, {order.buyer.get_state_display()}
+
+�🔔 ACTION REQUIRED:
 Please log in to your COVU seller dashboard to review and accept this order.
 
 👉 Login here: https://covu.ng/dashboard/orders/{order.id}

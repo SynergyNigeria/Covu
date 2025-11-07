@@ -49,7 +49,7 @@ class OrderService:
 
     @staticmethod
     @transaction.atomic
-    def create_order(buyer, product, delivery_address):
+    def create_order(buyer, product, delivery_message):
         """
         Create a new order with wallet debit and escrow hold.
 
@@ -64,7 +64,7 @@ class OrderService:
         Args:
             buyer: CustomUser instance (buyer)
             product: Product instance
-            delivery_address: String (delivery address)
+            delivery_message: String (delivery instructions and address)
 
         Returns:
             Order instance
@@ -137,7 +137,7 @@ class OrderService:
             product_price=product.price,
             delivery_fee=delivery_fee,
             total_amount=total_amount,
-            delivery_address=delivery_address,
+            delivery_message=delivery_message,
             status="PENDING",
             # Snapshot product details at order time
             product_name_snapshot=product.name,

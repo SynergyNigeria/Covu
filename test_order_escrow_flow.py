@@ -106,12 +106,12 @@ def get_stores(token, seller_id):
         return []
 
 
-def create_order(token, product_id, delivery_address):
+def create_order(token, product_id, delivery_message):
     """Create a new order"""
     response = requests.post(
         f"{BASE_URL}/orders/",
         headers={"Authorization": f"Bearer {token}"},
-        json={"product_id": product_id, "delivery_address": delivery_address},
+        json={"product_id": product_id, "delivery_message": delivery_message},
     )
 
     if response.status_code == 201:
@@ -275,8 +275,8 @@ def main():
 
     # Step 3: Buyer creates order
     print_section("STEP 3: Buyer Creates Order")
-    delivery_address = "123 Test Street, Lagos, Nigeria"
-    order = create_order(buyer_token, product["id"], delivery_address)
+    delivery_message = "123 Test Street, Lagos, Nigeria"
+    order = create_order(buyer_token, product["id"], delivery_message)
     if not order:
         return
 
@@ -347,7 +347,7 @@ def main():
     print_section("BONUS: Test Order Cancellation")
     print("Creating another order to test cancellation...")
 
-    cancel_order_obj = create_order(buyer_token, product["id"], delivery_address)
+    cancel_order_obj = create_order(buyer_token, product["id"], delivery_message)
     if cancel_order_obj:
         print("\nCancelling order as buyer...")
         cancel_order(buyer_token, cancel_order_obj["id"], "Changed my mind")

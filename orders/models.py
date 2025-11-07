@@ -81,8 +81,8 @@ class Order(models.Model):
     total_amount = models.DecimalField(
         max_digits=12, decimal_places=2, help_text="product_price + delivery_fee"
     )
-    delivery_address = models.TextField(
-        help_text="Full delivery address provided by buyer"
+    delivery_message = models.TextField(
+        help_text="Delivery instructions and address provided by buyer"
     )
 
     # Product snapshot fields (preserve what buyer actually ordered)

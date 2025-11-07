@@ -53,7 +53,9 @@ class NotificationService:
             f"Price: ₦{order.product_price:,.2f}\n"
             f"Delivery Fee: ₦{order.delivery_fee:,.2f}\n"
             f"Total: ₦{order.total_amount:,.2f}\n\n"
+            f"📍 DELIVERY INSTRUCTIONS:\n{order.delivery_message}\n\n"
             f"Buyer: {order.buyer.get_full_name()}\n"
+            f"Phone: {order.buyer.phone_number}\n"
             f"Location: {order.buyer.city}, {order.buyer.get_state_display()}\n\n"
             f"⚡ Please accept or reject this order in your dashboard."
         )
