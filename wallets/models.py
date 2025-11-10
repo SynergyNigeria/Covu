@@ -225,7 +225,8 @@ class BankAccount(models.Model):
             models.Index(fields=["user"]),
             models.Index(fields=["is_default"]),
         ]
-        unique_together = ["user", "account_number"]
+        # Allow same account number across different banks (e.g., OPay, Moniepoint using phone numbers)
+        unique_together = ["user", "account_number", "bank_code"]
 
     def __str__(self):
         return f"{self.account_name} - {self.bank_name} ({self.account_number})"

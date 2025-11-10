@@ -522,6 +522,52 @@ class VerifyPaymentView(APIView):
 # ==============================================================================
 
 
+class NigerianBanksView(APIView):
+    """
+    Get list of Nigerian banks from Paystack.
+
+    GET /api/wallet/banks/
+    Returns list of all Nigerian banks with codes.
+    No authentication required (public endpoint).
+    """
+
+    permission_classes = []  # Public endpoint
+
+    def get(self, request):
+        from django.conf import settings
+        import requests as http_requests
+
+        try:
+            paystack_url = "https://api.paystack.co/bank?country=nigeria"
+            headers = {"Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}"}
+
+            response = http_requests.get(paystack_url, headers=headers)
+            response.raise_for_status()
+
+            paystack_data = response.json()
+
+            if paystack_data.get("status"):
+                banks = paystack_data.get("data", [])
+                return Response(
+                    {"status": "success", "data": banks}, status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Failed to fetch banks from Paystack",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        except http_requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching banks from Paystack: {str(e)}")
+            return Response(
+                {"status": "error", "message": "Could not fetch bank list"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class BankAccountListCreateView(generics.ListCreateAPIView):
     """
     List and create bank accounts for withdrawals.
@@ -605,6 +651,69 @@ class BankAccountListCreateView(generics.ListCreateAPIView):
                         f"Bank account verified and recipient created: "
                         f"{user.email} - {account_name} ({account_number})"
                     )
+                elif recipient_response.status_code == 400:
+                    # Handle duplicate recipient (Paystack already has this account)
+                    try:
+                        error_data = recipient_response.json()
+                        error_message = error_data.get("message", "")
+
+                        # If recipient already exists, try to fetch it
+                        if (
+                            "already" in error_message.lower()
+                            or "duplicate" in error_message.lower()
+                        ):
+                            logger.info(
+                                f"Recipient already exists for {account_number}, fetching existing recipient..."
+                            )
+
+                            # Try to find existing recipient by listing recipients
+                            list_url = (
+                                f"https://api.paystack.co/transferrecipient?perPage=100"
+                            )
+                            list_response = http_requests.get(list_url, headers=headers)
+
+                            if list_response.status_code == 200:
+                                list_data = list_response.json()
+                                recipients = list_data.get("data", [])
+
+                                # Find matching recipient
+                                matching_recipient = None
+                                for recipient in recipients:
+                                    if (
+                                        recipient.get("details", {}).get(
+                                            "account_number"
+                                        )
+                                        == account_number
+                                        and recipient.get("details", {}).get(
+                                            "bank_code"
+                                        )
+                                        == bank_code
+                                    ):
+                                        matching_recipient = recipient
+                                        break
+
+                                if matching_recipient:
+                                    bank_account.paystack_recipient_code = (
+                                        matching_recipient["recipient_code"]
+                                    )
+                                    bank_account.save()
+                                    logger.info(
+                                        f"Using existing recipient: {matching_recipient['recipient_code']}"
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"Could not find existing recipient for {account_number}"
+                                    )
+                            else:
+                                logger.warning(
+                                    f"Failed to list recipients: {list_response.text}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Recipient creation failed: {error_message}"
+                            )
+                    except Exception as e:
+                        logger.error(f"Error handling duplicate recipient: {str(e)}")
                 else:
                     logger.warning(
                         f"Recipient creation failed but account verified: "
@@ -752,6 +861,22 @@ class WithdrawFundsView(generics.CreateAPIView):
                     status="PENDING",
                 )
 
+                # Check if bank account has recipient code
+                if not bank_account.paystack_recipient_code:
+                    withdrawal.status = "FAILED"
+                    withdrawal.failure_reason = (
+                        "Bank account not properly configured with Paystack"
+                    )
+                    withdrawal.save()
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": "Bank account not properly configured. Please delete and re-add this account.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
                 # Initiate Paystack transfer
                 paystack_url = "https://api.paystack.co/transfer"
                 headers = {
@@ -775,9 +900,16 @@ class WithdrawFundsView(generics.CreateAPIView):
                     },
                 }
 
+                logger.info(f"Initiating Paystack transfer: {payload}")
+
                 response = http_requests.post(
                     paystack_url, json=payload, headers=headers
                 )
+
+                # Log response for debugging
+                logger.info(f"Paystack response status: {response.status_code}")
+                logger.info(f"Paystack response body: {response.text}")
+
                 response.raise_for_status()
 
                 paystack_data = response.json()
@@ -878,10 +1010,30 @@ class WithdrawFundsView(generics.CreateAPIView):
                 withdrawal.failure_reason = str(e)
                 withdrawal.save()
 
+            # Check for specific Paystack errors
+            error_message = "Transfer service unavailable. Please try again."
+
+            # Parse Paystack error response
+            try:
+                if hasattr(e.response, "json"):
+                    error_data = e.response.json()
+                    paystack_message = error_data.get("message", "")
+
+                    # Check for business upgrade requirement
+                    if (
+                        "starter business" in paystack_message.lower()
+                        or "upgrade" in paystack_message.lower()
+                    ):
+                        error_message = "Withdrawals are temporarily unavailable. Your Paystack account needs to be upgraded to a Registered Business. Please contact support."
+                    elif paystack_message:
+                        error_message = paystack_message
+            except:
+                pass
+
             return Response(
                 {
                     "status": "error",
-                    "message": "Transfer service unavailable. Please try again.",
+                    "message": error_message,
                     "error": str(e),
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -1056,6 +1208,74 @@ class TransferWebhookView(APIView):
 
         # Return success for all other events
         return Response({"status": "success"}, status=status.HTTP_200_OK)
+
+
+# ==============================================================================
+# NIGERIAN BANKS LIST (from Paystack)
+# ==============================================================================
+
+
+class NigerianBanksView(APIView):
+    """
+    Get list of all Nigerian banks from Paystack.
+
+    GET /api/wallet/banks/
+    Returns list of banks with name and code.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Fetch Nigerian banks from Paystack"""
+        from django.conf import settings
+        import requests as http_requests
+
+        try:
+            paystack_url = "https://api.paystack.co/bank"
+            headers = {"Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}"}
+            params = {"country": "nigeria", "perPage": 100}
+
+            response = http_requests.get(
+                paystack_url, headers=headers, params=params, timeout=10
+            )
+            response.raise_for_status()
+
+            paystack_data = response.json()
+
+            if paystack_data.get("status"):
+                banks = paystack_data.get("data", [])
+                # Sort banks alphabetically
+                banks_sorted = sorted(banks, key=lambda x: x.get("name", ""))
+
+                return Response(
+                    {
+                        "status": "success",
+                        "data": [
+                            {
+                                "name": bank.get("name"),
+                                "code": bank.get("code"),
+                                "slug": bank.get("slug"),
+                            }
+                            for bank in banks_sorted
+                        ],
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                return Response(
+                    {"status": "error", "message": "Failed to fetch banks"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except http_requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching banks from Paystack: {str(e)}")
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Unable to fetch bank list. Please try again.",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
 
 # ==============================================================================

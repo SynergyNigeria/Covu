@@ -17,6 +17,7 @@ from .views import (
     WithdrawFundsView,
     WithdrawalHistoryView,
     TransferWebhookView,
+    NigerianBanksView,
 )
 
 app_name = "wallets"
@@ -31,6 +32,7 @@ urlpatterns = [
     path("webhook/", PaystackWebhookView.as_view(), name="paystack-webhook"),
     path("verify/<str:reference>/", VerifyPaymentView.as_view(), name="verify-payment"),
     # Bank account management (Phase 4)
+    path("banks/", NigerianBanksView.as_view(), name="nigerian-banks"),
     path("bank-accounts/", BankAccountListCreateView.as_view(), name="bank-accounts"),
     path(
         "bank-accounts/<uuid:pk>/",

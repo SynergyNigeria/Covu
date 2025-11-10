@@ -158,16 +158,18 @@ class BankAccountSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        """Check for duplicate account"""
+        """Check for duplicate account (same account number AND bank)"""
         user = self.context["request"].user
         account_number = attrs.get("account_number")
+        bank_code = attrs.get("bank_code")
 
-        # Check if user already has this account
+        # Check if user already has this EXACT account (same number + same bank)
+        # This allows same account number across different banks (e.g., OPay, Moniepoint using phone numbers)
         if BankAccount.objects.filter(
-            user=user, account_number=account_number
+            user=user, account_number=account_number, bank_code=bank_code
         ).exists():
             raise serializers.ValidationError(
-                "You have already added this bank account"
+                f"You have already added this account for {attrs.get('bank_name')}"
             )
 
         return attrs
