@@ -75,11 +75,28 @@ class StoreViewSet(viewsets.ModelViewSet):
         # Get category filter
         category_filter = request.query_params.get("category", "").strip()
         if category_filter:
-            # Filter stores that have products in this category
-            queryset = queryset.filter(
-                products__category__iexact=category_filter
-            ).distinct()
-            logger.info(f"Filtering stores with category: {category_filter}")
+            # Map display names to database values
+            category_mapping = {
+                "Men Clothes": "mens_clothes",
+                "Ladies Clothes": "ladies_clothes",
+                "Kids Clothes": "kids_clothes",
+                "Beauty": "beauty",
+                "Body Accessories": "body_accessories",
+                "Clothing Extras": "clothing_extras",
+                "Bags": "bags",
+                "Wigs": "wigs",
+                "Body Scents": "body_scents",
+            }
+
+            category_snake_case = category_mapping.get(
+                category_filter, category_filter.lower().replace(" ", "_")
+            )
+
+            # Filter stores by their store category (not product category)
+            queryset = queryset.filter(category__iexact=category_snake_case)
+            logger.info(
+                f"Filtering stores with category: {category_filter} -> {category_snake_case}"
+            )
 
         # Get user's location from their profile
         user_state = request.user.state
