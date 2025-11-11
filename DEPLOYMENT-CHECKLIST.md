@@ -57,9 +57,9 @@ PYTHON_VERSION = 3.11
 DATABASE_URL = [Select from database: covu-db]
 ALLOWED_HOSTS = .onrender.com
 
-# Paystack
-PAYSTACK_SECRET_KEY = sk_live_c93e17e4988a55974a0d5faa937d3e9996b59b5d
-PAYSTACK_PUBLIC_KEY = pk_live_7e0bd07296e05a65c1442481dfc352b723cf5a5c
+# Paystack (Use your actual keys from Paystack dashboard)
+PAYSTACK_SECRET_KEY = sk_live_your_secret_key_here
+PAYSTACK_PUBLIC_KEY = pk_live_your_public_key_here
 PAYSTACK_WEBHOOK_SECRET = [Get from Paystack dashboard]
 
 # Email
