@@ -115,11 +115,13 @@ WSGI_APPLICATION = "covu.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Priority: Render DATABASE_URL > Manual PostgreSQL > SQLite
-if "DATABASE_URL" in os.environ:
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
     # Render PostgreSQL (production)
     DATABASES = {
-        "default": dj_database_url.config(
-            default=os.environ.get("DATABASE_URL"),
+        "default": dj_database_url.parse(
+            DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
         )
