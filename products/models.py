@@ -83,6 +83,7 @@ class Product(models.Model):
             models.Index(fields=["is_active"]),
             models.Index(fields=["created_at"]),  # For new product visibility
             models.Index(fields=["store", "is_active"]),  # Optimize store queries
+            models.Index(fields=["name"]),  # For search performance
         ]
 
     def __str__(self):

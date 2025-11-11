@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 from .models import Product
 from .serializers import (
@@ -56,17 +57,35 @@ class ProductViewSet(viewsets.ModelViewSet):
         Algorithm: Randomness (30%), Location (30%), Recency (25%), Quality (15%)
 
         Query Params:
+            - search: Search products by name or description (optional)
             - category: Filter by category (men_clothes, ladies_clothes, etc.)
+            - store_id: Filter by store ID (optional)
             - premium_quality: Filter premium quality products (true/false)
             - durable: Filter durable products (true/false)
             - modern_design: Filter modern/stylish products (true/false)
             - easy_maintain: Filter easy to maintain products (true/false)
+            - page: Page number for pagination (default: 1)
+            - page_size: Number of results per page (default: 20)
         """
         queryset = self.get_queryset()
 
         # Get user's location from their profile
         user_state = request.user.state
         user_city = request.user.city
+
+        # Search functionality
+        search_query = request.query_params.get("search", "").strip()
+        if search_query:
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) | Q(description__icontains=search_query)
+            )
+            logger.info(f"Searching products with query: {search_query}")
+
+        # Store filter
+        store_id = request.query_params.get("store_id")
+        if store_id:
+            queryset = queryset.filter(store_id=store_id)
+            logger.info(f"Filtering products by store: {store_id}")
 
         # Apply filters from query params
         category = request.query_params.get("category")
@@ -92,15 +111,27 @@ class ProductViewSet(viewsets.ModelViewSet):
         # Apply custom ranking algorithm
         ranked_products = rank_products(queryset, user_state, user_city, category)
 
+        # Pagination
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 20))
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+
+        paginated_products = ranked_products[start_idx:end_idx]
+        has_next = end_idx < len(ranked_products)
+
         # Serialize and return
-        serializer = self.get_serializer(ranked_products, many=True)
+        serializer = self.get_serializer(paginated_products, many=True)
 
         return Response(
             {
                 "count": len(ranked_products),
+                "next": f"/api/products/?page={page + 1}" if has_next else None,
+                "previous": f"/api/products/?page={page - 1}" if page > 1 else None,
                 "results": serializer.data,
                 "filters": {
                     "category": category,
+                    "search": search_query,
                     "user_location": {"city": user_city, "state": user_state},
                 },
             }
