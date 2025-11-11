@@ -133,6 +133,7 @@ class Store(models.Model):
             models.Index(fields=["is_active"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["average_rating"]),
+            models.Index(fields=["name"]),  # For search performance
         ]
 
     def __str__(self):

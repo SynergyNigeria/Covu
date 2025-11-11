@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 from .models import Store
 from .serializers import (
@@ -67,10 +68,10 @@ class StoreViewSet(viewsets.ModelViewSet):
         # Get search query
         search_query = request.query_params.get("search", "").strip()
         if search_query:
-            queryset = queryset.filter(name__icontains=search_query) | queryset.filter(
-                description__icontains=search_query
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) | Q(description__icontains=search_query)
             )
-            logger.info(f"Filtering stores with search: {search_query}")
+            logger.info(f"Searching stores with query: {search_query}")
 
         # Get category filter
         category_filter = request.query_params.get("category", "").strip()
