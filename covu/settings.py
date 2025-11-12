@@ -114,42 +114,13 @@ WSGI_APPLICATION = "covu.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Priority: Render DATABASE_URL > Manual PostgreSQL > SQLite
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-if DATABASE_URL:
-    # Render PostgreSQL (production)
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
+# Using SQLite for both development and production (for testing)
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
-elif config("USE_POSTGRESQL", default=False, cast=bool):
-    # Manual PostgreSQL configuration
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": config("POSTGRES_DB", default="covu_db"),
-            "USER": config("POSTGRES_USER", default="postgres"),
-            "PASSWORD": config("POSTGRES_PASSWORD"),
-            "HOST": config("POSTGRES_HOST", default="localhost"),
-            "PORT": config("POSTGRES_PORT", default="5432"),
-            "CONN_MAX_AGE": 600,
-            "OPTIONS": {
-                "connect_timeout": 10,
-            },
-        }
-    }
-else:
-    # SQLite for local development
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 
 # Password validation
