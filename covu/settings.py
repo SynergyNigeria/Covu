@@ -478,6 +478,17 @@ EMAIL_TIMEOUT = 30  # Timeout in seconds
 # LOGGING CONFIGURATION (Security Audit Trail)
 # ==============================================================================
 
+# Create logs directory if it doesn't exist (for local development)
+LOGS_DIR = BASE_DIR / "logs"
+if not LOGS_DIR.exists():
+    try:
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    except:
+        pass  # Skip in production environments like Render
+
+# Use console-only logging in production (Render), file logging in development
+USE_FILE_LOGGING = LOGS_DIR.exists() and LOGS_DIR.is_dir()
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -502,54 +513,64 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
-        "file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "covu.log",
-            "formatter": "verbose",
-        },
-        "wallet_file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "wallet.log",
-            "formatter": "verbose",
-        },
-        "escrow_file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "escrow.log",
-            "formatter": "verbose",
-        },
-        "security_file": {
-            "level": "WARNING",
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "security.log",
-            "formatter": "verbose",
-        },
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
         "wallets": {
-            "handlers": ["wallet_file", "console"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
         "escrow": {
-            "handlers": ["escrow_file", "console"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
         "django.security": {
-            "handlers": ["security_file", "console"],
+            "handlers": ["console"],
             "level": "WARNING",
             "propagate": False,
         },
     },
 }
+
+# Add file handlers only if logs directory exists (local development)
+if USE_FILE_LOGGING:
+    LOGGING["handlers"].update({
+        "file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": LOGS_DIR / "covu.log",
+            "formatter": "verbose",
+        },
+        "wallet_file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": LOGS_DIR / "wallet.log",
+            "formatter": "verbose",
+        },
+        "escrow_file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": LOGS_DIR / "escrow.log",
+            "formatter": "verbose",
+        },
+        "security_file": {
+            "level": "WARNING",
+            "class": "logging.FileHandler",
+            "filename": LOGS_DIR / "security.log",
+            "formatter": "verbose",
+        },
+    })
+    # Update loggers to use file handlers
+    LOGGING["loggers"]["django"]["handlers"] = ["console", "file"]
+    LOGGING["loggers"]["wallets"]["handlers"] = ["wallet_file", "console"]
+    LOGGING["loggers"]["escrow"]["handlers"] = ["escrow_file", "console"]
+    LOGGING["loggers"]["django.security"]["handlers"] = ["security_file", "console"]
 
 
 # Default primary key field type
