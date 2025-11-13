@@ -614,8 +614,9 @@ if SENTRY_DSN:
         sample_rate=1.0 if DEBUG else 0.5,
         _experiments={
             "profiles_sample_rate": 0.1,
-            "include_source_context": False,  # Disable source context to avoid FrameLocalsProxy pickle error
+            "include_source_context": False,  # Disable source context and frame locals collection to avoid FrameLocalsProxy pickle error (Python 3.11+)
         },
+        in_app_include=[],  # Prevent Sentry from collecting frame locals
     )
 
     print(
