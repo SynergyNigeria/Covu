@@ -275,16 +275,16 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # Throttling disabled for development (Redis not running)
-    # "DEFAULT_THROTTLE_CLASSES": [
-    #     "rest_framework.throttling.AnonRateThrottle",
-    #     "rest_framework.throttling.UserRateThrottle",
-    # ],
-    # "DEFAULT_THROTTLE_RATES": {
-    #     "anon": "100/hour",
-    #     "user": "1000/hour",
-    #     "wallet": "50/hour",  # Stricter rate limiting for wallet operations
-    # },
+    # Rate limiting (uses Django cache - Redis in production, in-memory for dev)
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",  # Anonymous users: 100 requests per hour
+        "user": "1000/hour",  # Authenticated users: 1000 requests per hour
+        "wallet": "50/hour",  # Wallet operations: stricter limit
+    },
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
     "NON_FIELD_ERRORS_KEY": "error",
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
@@ -540,32 +540,34 @@ LOGGING = {
 
 # Add file handlers only if logs directory exists (local development)
 if USE_FILE_LOGGING:
-    LOGGING["handlers"].update({
-        "file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": LOGS_DIR / "covu.log",
-            "formatter": "verbose",
-        },
-        "wallet_file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": LOGS_DIR / "wallet.log",
-            "formatter": "verbose",
-        },
-        "escrow_file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": LOGS_DIR / "escrow.log",
-            "formatter": "verbose",
-        },
-        "security_file": {
-            "level": "WARNING",
-            "class": "logging.FileHandler",
-            "filename": LOGS_DIR / "security.log",
-            "formatter": "verbose",
-        },
-    })
+    LOGGING["handlers"].update(
+        {
+            "file": {
+                "level": "INFO",
+                "class": "logging.FileHandler",
+                "filename": LOGS_DIR / "covu.log",
+                "formatter": "verbose",
+            },
+            "wallet_file": {
+                "level": "INFO",
+                "class": "logging.FileHandler",
+                "filename": LOGS_DIR / "wallet.log",
+                "formatter": "verbose",
+            },
+            "escrow_file": {
+                "level": "INFO",
+                "class": "logging.FileHandler",
+                "filename": LOGS_DIR / "escrow.log",
+                "formatter": "verbose",
+            },
+            "security_file": {
+                "level": "WARNING",
+                "class": "logging.FileHandler",
+                "filename": LOGS_DIR / "security.log",
+                "formatter": "verbose",
+            },
+        }
+    )
     # Update loggers to use file handlers
     LOGGING["loggers"]["django"]["handlers"] = ["console", "file"]
     LOGGING["loggers"]["wallets"]["handlers"] = ["wallet_file", "console"]
