@@ -324,33 +324,38 @@ SIMPLE_JWT = {
 # CORS SETTINGS
 # ==============================================================================
 
-CORS_ALLOWED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500",
-).split(",")
+# In development, allow all origins. In production, use specific origins.
 
-CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOW_METHODS = [
-    "DELETE",
-    "GET",
-    "OPTIONS",
-    "PATCH",
-    "POST",
-    "PUT",
-]
-
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-]
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_HEADERS = ["*"]
+    CORS_ALLOW_METHODS = ["*"]
+else:
+    CORS_ALLOWED_ORIGINS = config(
+        "CORS_ALLOWED_ORIGINS",
+        default="https://covu-frontend.onrender.com",
+    ).split(",")
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_METHODS = [
+        "DELETE",
+        "GET",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+    ]
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
+    ]
 
 
 # ==============================================================================
@@ -601,25 +606,15 @@ if SENTRY_DSN:
 
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        # Django integration for better error context
-        integrations=[
-            DjangoIntegration(),
-        ],
-        # Performance monitoring (10% of transactions)
+        integrations=[DjangoIntegration()],
         traces_sample_rate=0.1,
-        # Environment tracking (helps distinguish dev/staging/production)
         environment="development" if DEBUG else "production",
-        # Release tracking (update this when deploying new versions)
         release="covu@1.0.0-phase4",
-        # Include user data in error reports (emails, IDs)
         send_default_pii=True,
-        # Capture 100% of errors in development, 50% in production
-        # (adjust for high-traffic production to save quota)
         sample_rate=1.0 if DEBUG else 0.5,
-        # Additional Django-specific options
         _experiments={
-            # Enable profiling (helps identify slow code)
             "profiles_sample_rate": 0.1,
+            "include_source_context": False,  # Disable source context to avoid FrameLocalsProxy pickle error
         },
     )
 
