@@ -212,6 +212,10 @@ X_FRAME_OPTIONS = "DENY"
 # CSRF Protection
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Strict"
+CSRF_TRUSTED_ORIGINS = [
+    "https://covu-frontend.onrender.com",
+    "https://covu.onrender.com",
+]
 
 # Session Security
 SESSION_COOKIE_HTTPONLY = True
@@ -227,6 +231,9 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Content Security Policy (CSP) - Prevents XSS attacks
+SECURE_REFERRER_POLICY = "same-origin"
 
 # Database transactions (selective use with @transaction.atomic)
 ATOMIC_REQUESTS = False  # We'll use decorators for wallet operations
