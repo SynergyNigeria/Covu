@@ -604,6 +604,11 @@ if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    # Initialize Sentry with explicit options to avoid collecting frame locals.
+    # Python 3.11+ exposes FrameLocalsProxy which is not picklable; when Sentry
+    # attempts to copy frame.f_locals it can raise TypeError. Setting
+    # include_source_context=False prevents Sentry from copying local variables.
+    # attach_stacktrace=False reduces the amount of context attached to events.
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration()],
@@ -612,9 +617,14 @@ if SENTRY_DSN:
         release="covu@1.0.0-phase4",
         send_default_pii=True,
         sample_rate=1.0 if DEBUG else 0.5,
+        # Prefer the official top-level option when available.
+        include_source_context=False,
+        attach_stacktrace=False,
+        # Keep experiments as a fallback for older SDKs, but the top-level
+        # include_source_context is preferred.
         _experiments={
             "profiles_sample_rate": 0.1,
-            "include_source_context": False,  # Disable source context and frame locals collection to avoid FrameLocalsProxy pickle error (Python 3.11+)
+            "include_source_context": False,
         },
         in_app_include=[],  # Prevent Sentry from collecting frame locals
     )
