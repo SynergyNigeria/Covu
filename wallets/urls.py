@@ -10,6 +10,7 @@ from .views import (
     FundWalletView,
     PaystackWebhookView,
     VerifyPaymentView,
+    PaystackReturnView,
     WithdrawView,  # Legacy - deprecated
     # Phase 4 - Withdrawal endpoints
     BankAccountListCreateView,
@@ -30,6 +31,7 @@ urlpatterns = [
     # Paystack funding (Phase 3)
     path("fund/", FundWalletView.as_view(), name="fund-wallet"),
     path("webhook/", PaystackWebhookView.as_view(), name="paystack-webhook"),
+    path("return/<str:reference>/", PaystackReturnView.as_view(), name="paystack-return"),
     path("verify/<str:reference>/", VerifyPaymentView.as_view(), name="verify-payment"),
     # Bank account management (Phase 4)
     path("banks/", NigerianBanksView.as_view(), name="nigerian-banks"),

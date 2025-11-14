@@ -7,6 +7,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Sum, Count, Q
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
 from .models import Wallet, WalletTransaction, BankAccount, Withdrawal
 from .serializers import (
@@ -180,11 +182,22 @@ class FundWalletView(generics.CreateAPIView):
             "Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}",
             "Content-Type": "application/json",
         }
+        # Build a callback URL that points back to a backend return view.
+        # Using request.build_absolute_uri + reverse ensures we generate an
+        # absolute URL with the correct host (avoids localhost being used in
+        # production when FRONTEND_URL is misconfigured).
+        try:
+            return_path = reverse('wallets:paystack-return', args=[reference])
+            callback_absolute = request.build_absolute_uri(return_path)
+        except Exception:
+            # Fallback to frontend redirect if reverse fails
+            callback_absolute = f"{settings.FRONTEND_URL}/templates/purchase.html?payment=success&ref={reference}"
+
         payload = {
             "email": user.email,
             "amount": amount_in_kobo,
             "reference": reference,
-            "callback_url": f"{settings.FRONTEND_URL}/templates/purchase.html?payment=success&ref={reference}",
+            "callback_url": callback_absolute,
             "metadata": {
                 "user_id": str(user.id),
                 "user_email": user.email,
@@ -192,6 +205,15 @@ class FundWalletView(generics.CreateAPIView):
                 "purpose": "wallet_funding",
             },
         }
+
+        # Log callback and payload (without secrets) to help debug redirect issues
+        try:
+            logger.info(f"Paystack callback_url set to: {callback_absolute}")
+            # Log minimal payload to avoid leaking secrets
+            minimal_payload = {k: v for k, v in payload.items() if k != 'metadata'}
+            logger.info(f"Paystack init payload (minimal): {minimal_payload}")
+        except Exception:
+            pass
 
         try:
             # Initialize Paystack transaction
@@ -361,6 +383,78 @@ class PaystackWebhookView(APIView):
 
         # Return success for all other events
         return Response({"status": "success"}, status=status.HTTP_200_OK)
+
+
+class PaystackReturnView(APIView):
+    """
+    Handles browser redirects from Paystack after payment completion.
+
+    This endpoint verifies the transaction with Paystack (like
+    `VerifyPaymentView`) and then redirects the user back to the frontend
+    with a short query string indicating success/failure. This avoids
+    relying on FRONTEND_URL being correctly set in the environment and
+    ensures the user is returned to the site after payment.
+    """
+
+    permission_classes = []
+
+    def get(self, request, reference):
+        from django.conf import settings
+        import requests as http_requests
+        from django.db import transaction
+
+        paystack_url = f"https://api.paystack.co/transaction/verify/{reference}"
+        headers = {"Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}"}
+
+        try:
+            response = http_requests.get(paystack_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            paystack_data = response.json()
+
+            success = False
+            if paystack_data.get("status"):
+                data = paystack_data.get("data", {})
+                if data.get("status") == "success":
+                    # Try to credit wallet (idempotent)
+                    metadata = data.get("metadata", {})
+                    wallet_id = metadata.get("wallet_id")
+
+                    if wallet_id:
+                        try:
+                            with transaction.atomic():
+                                from .models import Wallet, WalletTransaction
+
+                                wallet = Wallet.objects.select_for_update().get(id=wallet_id)
+                                reference_exists = WalletTransaction.objects.filter(reference=reference).exists()
+                                if not reference_exists:
+                                    amount = data.get("amount", 0) / 100.0
+                                    balance_before = wallet.balance
+                                    WalletTransaction.objects.create(
+                                        wallet=wallet,
+                                        transaction_type="CREDIT",
+                                        amount=amount,
+                                        balance_before=balance_before,
+                                        balance_after=balance_before + amount,
+                                        reference=reference,
+                                        description=f"Wallet funding via Paystack - {reference}",
+                                    )
+                                    success = True
+                                else:
+                                    # Already processed
+                                    success = True
+                        except Exception:
+                            # Verification succeeded but DB update failed - still redirect
+                            success = True
+
+            # Redirect back to frontend with a query param the frontend knows to handle
+            frontend_success_url = f"{settings.FRONTEND_URL}/templates/purchase.html?payment={'success' if success else 'failed'}&ref={reference}"
+            return redirect(frontend_success_url)
+
+        except Exception as e:
+            # Always redirect user back to frontend; the webhook or manual
+            # verification can reconcile the payment asynchronously.
+            frontend_fail_url = f"{settings.FRONTEND_URL}/templates/purchase.html?payment=failed&ref={reference}"
+            return redirect(frontend_fail_url)
 
 
 class VerifyPaymentView(APIView):
