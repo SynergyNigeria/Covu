@@ -187,7 +187,7 @@ class FundWalletView(generics.CreateAPIView):
         # absolute URL with the correct host (avoids localhost being used in
         # production when FRONTEND_URL is misconfigured).
         try:
-            return_path = reverse('wallets:paystack-return', args=[reference])
+            return_path = reverse("wallets:paystack-return", args=[reference])
             callback_absolute = request.build_absolute_uri(return_path)
         except Exception:
             # Fallback to frontend redirect if reverse fails
@@ -210,7 +210,7 @@ class FundWalletView(generics.CreateAPIView):
         try:
             logger.info(f"Paystack callback_url set to: {callback_absolute}")
             # Log minimal payload to avoid leaking secrets
-            minimal_payload = {k: v for k, v in payload.items() if k != 'metadata'}
+            minimal_payload = {k: v for k, v in payload.items() if k != "metadata"}
             logger.info(f"Paystack init payload (minimal): {minimal_payload}")
         except Exception:
             pass
@@ -424,8 +424,12 @@ class PaystackReturnView(APIView):
                             with transaction.atomic():
                                 from .models import Wallet, WalletTransaction
 
-                                wallet = Wallet.objects.select_for_update().get(id=wallet_id)
-                                reference_exists = WalletTransaction.objects.filter(reference=reference).exists()
+                                wallet = Wallet.objects.select_for_update().get(
+                                    id=wallet_id
+                                )
+                                reference_exists = WalletTransaction.objects.filter(
+                                    reference=reference
+                                ).exists()
                                 if not reference_exists:
                                     amount = data.get("amount", 0) / 100.0
                                     balance_before = wallet.balance
